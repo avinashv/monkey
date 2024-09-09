@@ -1,7 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"monkey/repl"
+	"os"
+)
 
 func main() {
-	fmt.Printf("Hello, world!\n")
+	// initialize the REPL
+	fmt.Printf("Monkey v0.1\n")
+	repl.Start(os.Stdin, os.Stdout)
 }
