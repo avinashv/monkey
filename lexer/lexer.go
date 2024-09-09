@@ -18,15 +18,20 @@ func New(input string) *Lexer {
 	return lexer
 }
 
+// peekChar returns the next character in the input without advancing the position.
+func (lexer *Lexer) peekChar() byte {
+	if lexer.readPosition >= len(lexer.input) {
+		// EOF
+		return 0
+	} else {
+		// peek the next character
+		return lexer.input[lexer.readPosition]
+	}
+}
+
 // readChar reads the next character in the input and advances the position in the input string.
 func (lexer *Lexer) readChar() {
-	if lexer.readPosition >= len(lexer.input) {
-		// EOF, ASCII code 0 is the "NUL" character
-		lexer.char = 0
-	} else {
-		// read the next character
-		lexer.char = lexer.input[lexer.readPosition]
-	}
+	lexer.char = lexer.peekChar()
 
 	// move the position forward
 	lexer.position = lexer.readPosition
@@ -42,17 +47,43 @@ func (lexer *Lexer) NextToken() token.Token {
 
 	switch lexer.char {
 	case '=':
-		tok = newToken(token.ASSIGN, lexer.char)
+		// check for equality or assignment
+		if lexer.peekChar() == '=' {
+			// read the next character
+			lexer.readChar()
+			tok = token.Token{Type: token.EQ, Literal: "=="}
+		} else {
+			tok = newToken(token.ASSIGN, lexer.char)
+		}
+	case '+':
+		tok = newToken(token.PLUS, lexer.char)
+	case '-':
+		tok = newToken(token.MINUS, lexer.char)
+	case '!':
+		// check for inequality or bang
+		if lexer.peekChar() == '=' {
+			// read the next character
+			lexer.readChar()
+			tok = token.Token{Type: token.NOT_EQ, Literal: "!="}
+		} else {
+			tok = newToken(token.BANG, lexer.char)
+		}
+	case '/':
+		tok = newToken(token.SLASH, lexer.char)
+	case '*':
+		tok = newToken(token.ASTERISK, lexer.char)
+	case '<':
+		tok = newToken(token.LT, lexer.char)
+	case '>':
+		tok = newToken(token.GT, lexer.char)
 	case ';':
 		tok = newToken(token.SEMICOLON, lexer.char)
+	case ',':
+		tok = newToken(token.COMMA, lexer.char)
 	case '(':
 		tok = newToken(token.LPAREN, lexer.char)
 	case ')':
 		tok = newToken(token.RPAREN, lexer.char)
-	case ',':
-		tok = newToken(token.COMMA, lexer.char)
-	case '+':
-		tok = newToken(token.PLUS, lexer.char)
 	case '{':
 		tok = newToken(token.LBRACE, lexer.char)
 	case '}':
