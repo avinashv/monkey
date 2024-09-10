@@ -5,6 +5,7 @@ import "monkey/token"
 // Node represents a node in the AST.
 type Node interface {
 	TokenLiteral() string
+	String() string
 }
 
 // Statement represents a statement in the AST.
@@ -33,15 +34,34 @@ func (program *Program) TokenLiteral() string {
 	}
 }
 
-// LetStatement represents a let statement in the AST.
-type LetStatement struct {
-	Token token.Token // the token.LET token
-	Name  *Identifier
-	Value Expression
+func (program *Program) String() string {
+	var output string
+
+	for _, statement := range program.Statements {
+		output += statement.String()
+	}
+
+	return output
 }
 
-func (letStatement *LetStatement) statementNode()       {}
-func (letStatement *LetStatement) TokenLiteral() string { return letStatement.Token.Literal }
+// ExpressionStatement represents an expression statement in the AST.
+type ExpressionStatement struct {
+	Token      token.Token // the first token of the expression
+	Expression Expression
+}
+
+func (expressionStatement *ExpressionStatement) statementNode() {}
+func (expressionStatement *ExpressionStatement) TokenLiteral() string {
+	return expressionStatement.Token.Literal
+}
+
+func (expressionStatement *ExpressionStatement) String() string {
+	if expressionStatement.Expression != nil {
+		return expressionStatement.Expression.String()
+	}
+
+	return ""
+}
 
 // Identifier represents an identifier in the AST.
 type Identifier struct {
@@ -49,13 +69,55 @@ type Identifier struct {
 	Value string
 }
 
+func (identifier *Identifier) String() string { return identifier.Value }
+
 func (identifier *Identifier) expressionNode()      {}
 func (identifier *Identifier) TokenLiteral() string { return identifier.Token.Literal }
+
+// LetStatement represents a let statement in the AST.
+type LetStatement struct {
+	Token token.Token // the token.LET token
+	Name  *Identifier
+	Value Expression
+}
+
+func (letStatement *LetStatement) String() string {
+	var output string
+
+	output += letStatement.TokenLiteral() + " "
+	output += letStatement.Name.String()
+	output += " = "
+
+	if letStatement.Value != nil {
+		output += letStatement.Value.String()
+	}
+
+	output += ";"
+
+	return output
+}
+
+func (letStatement *LetStatement) statementNode()       {}
+func (letStatement *LetStatement) TokenLiteral() string { return letStatement.Token.Literal }
 
 // ReturnStatement represents a return statement in the AST.
 type ReturnStatement struct {
 	Token       token.Token // the token.RETURN token
 	ReturnValue Expression
+}
+
+func (returnStatement *ReturnStatement) String() string {
+	var output string
+
+	output += returnStatement.TokenLiteral() + " "
+
+	if returnStatement.ReturnValue != nil {
+		output += returnStatement.ReturnValue.String()
+	}
+
+	output += ";"
+
+	return output
 }
 
 func (returnStatement *ReturnStatement) statementNode()       {}
