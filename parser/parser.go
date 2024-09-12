@@ -7,11 +7,44 @@ import (
 	"monkey/token"
 )
 
+// Define the precedence of the operators.
+const (
+	_ int = iota
+	LOWEST
+	EQUALS      // ==
+	LESSGREATER // > or <
+	SUM         // +
+	PRODUCT     // *
+	PREFIX      // -X or !X
+	CALL        // myFunction(X)
+)
+
+// Define the prefix and infix parse functions.
+type (
+	prefixParseFn func() ast.Expression
+	infixParseFn  func(ast.Expression) ast.Expression
+)
+
+// Parser represents the parser.
 type Parser struct {
-	lexer        *lexer.Lexer
-	errors       []string
+	lexer  *lexer.Lexer
+	errors []string
+
 	currentToken token.Token
 	peekToken    token.Token
+
+	prefixParseFns map[token.TokenType]prefixParseFn
+	infixParseFns  map[token.TokenType]infixParseFn
+}
+
+// registerPrefix registers a prefix parse function for a token type.
+func (parser *Parser) registerPrefix(tokenType token.TokenType, function prefixParseFn) {
+	parser.prefixParseFns[tokenType] = function
+}
+
+// registerInfix registers an infix parse function for a token type.
+func (parser *Parser) registerInfix(tokenType token.TokenType, function infixParseFn) {
+	parser.infixParseFns[tokenType] = function
 }
 
 // New creates a new parser instance.
@@ -21,6 +54,9 @@ func New(lexer *lexer.Lexer) *Parser {
 		errors: []string{},
 	}
 
+	parser.prefixParseFns = make(map[token.TokenType]prefixParseFn)
+	parser.registerPrefix(token.IDENT, parser.parseIdentifier)
+
 	// read two tokens, so currentToken and peekToken are both set
 	parser.nextToken()
 	parser.nextToken()
@@ -28,10 +64,12 @@ func New(lexer *lexer.Lexer) *Parser {
 	return parser
 }
 
+// Errors returns the list of errors encountered during parsing.
 func (parser *Parser) Errors() []string {
 	return parser.errors
 }
 
+// peekError appends an error message to the list of errors.
 func (parser *Parser) peekError(token token.TokenType) {
 	msg := fmt.Sprintf("expected next token to be %s, got %s instead", token, parser.peekToken.Type)
 	parser.errors = append(parser.errors, msg)
@@ -73,8 +111,37 @@ func (parser *Parser) parseStatement() ast.Statement {
 	case token.RETURN:
 		return parser.parseReturnStatement()
 	default:
+		return parser.parseExpressionStatement()
+	}
+}
+
+// parseExpression parses an expression.
+func (parser *Parser) parseExpression(precedence int) ast.Expression {
+	// get the prefix parse function for the current token
+	prefix := parser.prefixParseFns[parser.currentToken.Type]
+	if prefix == nil {
 		return nil
 	}
+
+	// parse the left expression
+	left := prefix()
+
+	// loop until the precedence of the next token is less than the current precedence
+	//for !parser.peekTokenIs(token.SEMICOLON) && precedence < parser.peekPrecedence() {
+	//	// get the infix parse function for the next token
+	//	infix := parser.infixParseFn[parser.peekToken.Type]
+	//	if infix == nil {
+	//		return left
+	//	}
+	//
+	//	// advance the tokens
+	//	parser.nextToken()
+	//
+	//	// parse the infix expression
+	//	left = infix(left)
+	//}
+
+	return left
 }
 
 // parseLetStatement parses a let statement.
@@ -116,6 +183,28 @@ func (parser *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	// return the return statement
 	return statement
+}
+
+// parseExpressionStatement parses an expression statement.
+func (parser *Parser) parseExpressionStatement() *ast.ExpressionStatement {
+	// create the expression statement
+	statement := &ast.ExpressionStatement{Token: parser.currentToken}
+
+	// parse the expression
+	statement.Expression = parser.parseExpression(LOWEST)
+
+	// check if the next token is a semicolon
+	if parser.peekTokenIs(token.SEMICOLON) {
+		parser.nextToken()
+	}
+
+	// return the expression statement
+	return statement
+}
+
+// parseIdentifier parses an identifier.
+func (parser *Parser) parseIdentifier() ast.Expression {
+	return &ast.Identifier{Token: parser.currentToken, Value: parser.currentToken.Literal}
 }
 
 // currentTokenIs checks if the current token is of the given type.
