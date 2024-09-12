@@ -69,10 +69,19 @@ type Identifier struct {
 	Value string
 }
 
-func (identifier *Identifier) String() string { return identifier.Value }
-
+func (identifier *Identifier) String() string       { return identifier.Value }
 func (identifier *Identifier) expressionNode()      {}
 func (identifier *Identifier) TokenLiteral() string { return identifier.Token.Literal }
+
+// IntegerLiteral represents an integer literal in the AST.
+type IntegerLiteral struct {
+	Token token.Token // the token.INT token
+	Value int64
+}
+
+func (integerLiteral *IntegerLiteral) String() string       { return integerLiteral.Token.Literal }
+func (integerLiteral *IntegerLiteral) expressionNode()      {}
+func (integerLiteral *IntegerLiteral) TokenLiteral() string { return integerLiteral.Token.Literal }
 
 // LetStatement represents a let statement in the AST.
 type LetStatement struct {

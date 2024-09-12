@@ -5,6 +5,7 @@ import (
 	"monkey/ast"
 	"monkey/lexer"
 	"monkey/token"
+	"strconv"
 )
 
 // Define the precedence of the operators.
@@ -56,6 +57,7 @@ func New(lexer *lexer.Lexer) *Parser {
 
 	parser.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	parser.registerPrefix(token.IDENT, parser.parseIdentifier)
+	parser.registerPrefix(token.INT, parser.parseIntegerLiteral)
 
 	// read two tokens, so currentToken and peekToken are both set
 	parser.nextToken()
@@ -205,6 +207,24 @@ func (parser *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 // parseIdentifier parses an identifier.
 func (parser *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: parser.currentToken, Value: parser.currentToken.Literal}
+}
+
+// parseIntegerLiteral parses an integer literal.
+func (parser *Parser) parseIntegerLiteral() ast.Expression {
+	// create the integer literal
+	literal := &ast.IntegerLiteral{Token: parser.currentToken}
+
+	// parse the integer value
+	value, err := strconv.ParseInt(parser.currentToken.Literal, 0, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as integer", parser.currentToken.Literal)
+		parser.errors = append(parser.errors, msg)
+		return nil
+	}
+	literal.Value = value
+
+	// return the integer literal
+	return literal
 }
 
 // currentTokenIs checks if the current token is of the given type.
