@@ -131,3 +131,50 @@ func (returnStatement *ReturnStatement) String() string {
 
 func (returnStatement *ReturnStatement) statementNode()       {}
 func (returnStatement *ReturnStatement) TokenLiteral() string { return returnStatement.Token.Literal }
+
+// PrefixExpression represents a prefix expression in the AST.
+type PrefixExpression struct {
+	Token    token.Token // the prefix token, e.g. !
+	Operator string
+	Right    Expression
+}
+
+func (prefixExpression *PrefixExpression) String() string {
+	var output string
+
+	output = "(" + prefixExpression.Operator
+	output += prefixExpression.Right.String()
+	output += ")"
+
+	return output
+}
+
+func (prefixExpression *PrefixExpression) expressionNode() {}
+func (prefixExpression *PrefixExpression) TokenLiteral() string {
+	return prefixExpression.Token.Literal
+}
+
+// InfixExpression represents an infix expression in the AST.
+type InfixExpression struct {
+	Token    token.Token // the operator token, e.g. +
+	Left     Expression
+	Operator string
+	Right    Expression
+}
+
+func (infixExpression *InfixExpression) String() string {
+	var output string
+
+	output = "("
+	output += infixExpression.Left.String()
+	output += " " + infixExpression.Operator + " "
+	output += infixExpression.Right.String()
+	output += ")"
+
+	return output
+}
+
+func (infixExpression *InfixExpression) expressionNode() {}
+func (infixExpression *InfixExpression) TokenLiteral() string {
+	return infixExpression.Token.Literal
+}
