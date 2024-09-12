@@ -178,3 +178,115 @@ func (infixExpression *InfixExpression) expressionNode() {}
 func (infixExpression *InfixExpression) TokenLiteral() string {
 	return infixExpression.Token.Literal
 }
+
+// Boolean represents a boolean in the AST.
+type Boolean struct {
+	Token token.Token
+	Value bool
+}
+
+func (boolean *Boolean) String() string       { return boolean.Token.Literal }
+func (boolean *Boolean) expressionNode()      {}
+func (boolean *Boolean) TokenLiteral() string { return boolean.Token.Literal }
+
+// IfExpression represents an if expression in the AST.
+type IfExpression struct {
+	Token       token.Token // the if token
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternative *BlockStatement
+}
+
+func (ifExpression *IfExpression) String() string {
+	var output string
+
+	output = "if"
+	output += ifExpression.Condition.String()
+	output += " " + ifExpression.Consequence.String()
+
+	if ifExpression.Alternative != nil {
+		output += "else " + ifExpression.Alternative.String()
+	}
+
+	return output
+}
+
+func (ifExpression *IfExpression) expressionNode()      {}
+func (ifExpression *IfExpression) TokenLiteral() string { return ifExpression.Token.Literal }
+
+// BlockStatement represents a block statement in the AST.
+type BlockStatement struct {
+	Token      token.Token // the { token
+	Statements []Statement
+}
+
+func (blockStatement *BlockStatement) String() string {
+	var output string
+
+	for _, statement := range blockStatement.Statements {
+		output += statement.String()
+	}
+
+	return output
+}
+
+func (blockStatement *BlockStatement) statementNode()       {}
+func (blockStatement *BlockStatement) TokenLiteral() string { return blockStatement.Token.Literal }
+
+// FunctionLiteral represents a function literal in the AST.
+type FunctionLiteral struct {
+	Token      token.Token // the fn token
+	Parameters []*Identifier
+	Body       *BlockStatement
+}
+
+func (functionLiteral *FunctionLiteral) String() string {
+	var output string
+
+	output = functionLiteral.TokenLiteral()
+	output += "("
+
+	for i, parameter := range functionLiteral.Parameters {
+		if i != 0 {
+			output += ", "
+		}
+
+		output += parameter.String()
+	}
+
+	output += ")" + functionLiteral.Body.String()
+
+	return output
+}
+
+func (functionLiteral *FunctionLiteral) expressionNode()      {}
+func (functionLiteral *FunctionLiteral) TokenLiteral() string { return functionLiteral.Token.Literal }
+
+// CallExpression represents a call expression in the AST.
+type CallExpression struct {
+	Token     token.Token // the ( token
+	Function  Expression  // Identifier or FunctionLiteral
+	Arguments []Expression
+}
+
+func (callExpression *CallExpression) String() string {
+	var output string
+
+	output = callExpression.Function.String()
+	output += "("
+
+	for i, argument := range callExpression.Arguments {
+		if i != 0 {
+			output += ", "
+		}
+
+		output += argument.String()
+	}
+
+	output += ")"
+
+	return output
+}
+
+func (callExpression *CallExpression) expressionNode()      {}
+func (callExpression *CallExpression) TokenLiteral() string { return callExpression.Token.Literal }

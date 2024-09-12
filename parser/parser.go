@@ -29,6 +29,7 @@ var precedences = map[token.TokenType]int{
 	token.MINUS:    SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
+	token.LPAREN:   CALL,
 }
 
 // Define the prefix and infix parse functions.
@@ -71,6 +72,11 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerPrefix(token.INT, parser.parseIntegerLiteral)
 	parser.registerPrefix(token.BANG, parser.parsePrefixExpression)
 	parser.registerPrefix(token.MINUS, parser.parsePrefixExpression)
+	parser.registerPrefix(token.TRUE, parser.parseBoolean)
+	parser.registerPrefix(token.FALSE, parser.parseBoolean)
+	parser.registerPrefix(token.LPAREN, parser.parseGroupedExpression)
+	parser.registerPrefix(token.IF, parser.parseIfExpression)
+	parser.registerPrefix(token.FUNCTION, parser.parseFunctionLiteral)
 
 	parser.infixParseFns = make(map[token.TokenType]infixParseFn)
 	parser.registerInfix(token.PLUS, parser.parseInfixExpression)
@@ -81,6 +87,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerInfix(token.NOT_EQ, parser.parseInfixExpression)
 	parser.registerInfix(token.LT, parser.parseInfixExpression)
 	parser.registerInfix(token.GT, parser.parseInfixExpression)
+	parser.registerInfix(token.LPAREN, parser.parseCallExpression)
 
 	// read two tokens, so currentToken and peekToken are both set
 	parser.nextToken()
@@ -188,8 +195,14 @@ func (parser *Parser) parseLetStatement() *ast.LetStatement {
 		return nil
 	}
 
-	// TODO skip the expression for now
-	for !parser.currentTokenIs(token.SEMICOLON) {
+	// advance the tokens
+	parser.nextToken()
+
+	// parse the expression
+	statement.Value = parser.parseExpression(LOWEST)
+
+	// check if the next token is a semicolon
+	if parser.peekTokenIs(token.SEMICOLON) {
 		parser.nextToken()
 	}
 
@@ -202,8 +215,14 @@ func (parser *Parser) parseReturnStatement() *ast.ReturnStatement {
 	// create the return statement
 	statement := &ast.ReturnStatement{Token: parser.currentToken}
 
-	// TODO skip the expression for now
-	for !parser.currentTokenIs(token.SEMICOLON) {
+	// advance the tokens
+	parser.nextToken()
+
+	// parse the return value
+	statement.ReturnValue = parser.parseExpression(LOWEST)
+
+	// check if the next token is a semicolon
+	if parser.peekTokenIs(token.SEMICOLON) {
 		parser.nextToken()
 	}
 
@@ -289,6 +308,209 @@ func (parser *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 
 	// return the infix expression
 	return expression
+}
+
+// parseBoolean parses a boolean.
+func (parser *Parser) parseBoolean() ast.Expression {
+	return &ast.Boolean{Token: parser.currentToken, Value: parser.currentTokenIs(token.TRUE)}
+}
+
+// parseGroupedExpression parses a grouped expression.
+func (parser *Parser) parseGroupedExpression() ast.Expression {
+	// advance the tokens
+	parser.nextToken()
+
+	// parse the expression
+	expression := parser.parseExpression(LOWEST)
+
+	// check if the next token is a closing parenthesis
+	if !parser.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// return the grouped expression
+	return expression
+}
+
+// parseIfExpression parses an if expression.
+func (parser *Parser) parseIfExpression() ast.Expression {
+	// create the if expression
+	expression := &ast.IfExpression{Token: parser.currentToken}
+
+	// check if the next token is a left parenthesis
+	if !parser.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// advance the tokens
+	parser.nextToken()
+
+	// parse the condition
+	expression.Condition = parser.parseExpression(LOWEST)
+
+	// check if the next token is a right parenthesis
+	if !parser.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// check if the next token is a left brace
+	if !parser.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// parse the consequence
+	expression.Consequence = parser.parseBlockStatement()
+
+	// check if the next token is an else
+	if parser.peekTokenIs(token.ELSE) {
+		// advance the tokens
+		parser.nextToken()
+
+		// check if the next token is a left brace
+		if !parser.expectPeek(token.LBRACE) {
+			return nil
+		}
+
+		// parse the alternative
+		expression.Alternative = parser.parseBlockStatement()
+	}
+
+	// return the if expression
+	return expression
+}
+
+// parseFunctionLiteral parses a function literal.
+func (parser *Parser) parseFunctionLiteral() ast.Expression {
+	// create the function literal
+	literal := &ast.FunctionLiteral{Token: parser.currentToken}
+
+	// check if the next token is a left parenthesis
+	if !parser.expectPeek(token.LPAREN) {
+		return nil
+	}
+
+	// parse the parameters
+	literal.Parameters = parser.parseFunctionParameters()
+
+	// check if the next token is a left brace
+	if !parser.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// parse the body
+	literal.Body = parser.parseBlockStatement()
+
+	// return the function literal
+	return literal
+}
+
+// parseBlockStatement parses a block statement.
+func (parser *Parser) parseBlockStatement() *ast.BlockStatement {
+	// create the block statement
+	block := &ast.BlockStatement{Token: parser.currentToken}
+	block.Statements = []ast.Statement{}
+
+	// advance the tokens
+	parser.nextToken()
+
+	// parse each statement in the block until a right brace is found
+	for !parser.currentTokenIs(token.RBRACE) {
+		// parse the statement
+		statement := parser.parseStatement()
+
+		// add the statement to the block if not nil
+		if statement != nil {
+			block.Statements = append(block.Statements, statement)
+		}
+		parser.nextToken()
+	}
+
+	// return the block statement
+	return block
+}
+
+// parseFunctionParameters parses the parameters of a function.
+func (parser *Parser) parseFunctionParameters() []*ast.Identifier {
+	// create the list of identifiers
+	identifiers := []*ast.Identifier{}
+
+	// check if the next token is a right parenthesis
+	if parser.peekTokenIs(token.RPAREN) {
+		parser.nextToken()
+		return identifiers
+	}
+
+	// advance the tokens
+	parser.nextToken()
+
+	// create the identifier
+	identifier := &ast.Identifier{Token: parser.currentToken, Value: parser.currentToken.Literal}
+	identifiers = append(identifiers, identifier)
+
+	// loop until a right parenthesis is found
+	for parser.peekTokenIs(token.COMMA) {
+		// advance the tokens
+		parser.nextToken()
+		parser.nextToken()
+
+		// create the identifier
+		identifier := &ast.Identifier{Token: parser.currentToken, Value: parser.currentToken.Literal}
+		identifiers = append(identifiers, identifier)
+	}
+
+	// check if the next token is a right parenthesis
+	if !parser.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// return the list of identifiers
+	return identifiers
+}
+
+// parseCallExpression parses a call expression.
+func (parser *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	// create the call expression
+	expression := &ast.CallExpression{Token: parser.currentToken, Function: function}
+	expression.Arguments = parser.parseCallArguments()
+
+	// return the call expression
+	return expression
+}
+
+// parseCallArguments parses the arguments of a call expression.
+func (parser *Parser) parseCallArguments() []ast.Expression {
+	// create the list of arguments
+	arguments := []ast.Expression{}
+
+	// check if the next token is a right parenthesis
+	if parser.peekTokenIs(token.RPAREN) {
+		parser.nextToken()
+		return arguments
+	}
+
+	// advance the tokens
+	parser.nextToken()
+
+	// parse the first argument
+	arguments = append(arguments, parser.parseExpression(LOWEST))
+
+	// loop while arguments are found
+	for parser.peekTokenIs(token.COMMA) {
+		// advance the tokens
+		parser.nextToken()
+		parser.nextToken()
+
+		// parse the argument
+		arguments = append(arguments, parser.parseExpression(LOWEST))
+	}
+
+	// check if the next token is a right parenthesis
+	if !parser.expectPeek(token.RPAREN) {
+		return nil
+	}
+
+	// return the list of arguments
+	return arguments
 }
 
 // currentTokenIs checks if the current token is of the given type.
